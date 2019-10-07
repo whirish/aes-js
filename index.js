@@ -186,16 +186,21 @@
         return result;
     }
 
-    var AES = function(key) {
-        if (!(this instanceof AES)) {
-            throw Error('AES must be instanitated with `new`');
+    var AES = function () {
+        if (arguments.length === 1) {
+            if (!(this instanceof AES)) {
+                throw Error('AES must be instanitated with `new`');
+            }
+
+            Object.defineProperty(this, 'key', {
+                value: coerceArray(key, true)
+            });
+
+            this._prepare();
+        } else {
+            this._Ke = arguments[0];
+            this._Kd = arguments[1];
         }
-
-        Object.defineProperty(this, 'key', {
-            value: coerceArray(key, true)
-        });
-
-        this._prepare();
     }
 
 
@@ -444,7 +449,27 @@
         this._aes = new AES(key);
     }
 
-    ModeOfOperationCBC.prototype.encrypt = function(plaintext) {
+    var ModeOfOperationCBCExpanded = function(Ke, Kd, iv) {
+        if (!(this instanceof ModeOfOperationCBCExpanded)) {
+            throw Error('AES must be instanitated with `new`');
+        }
+
+        this.description = "Cipher Block Chaining";
+        this.name = "cbc";
+
+        if (!iv) {
+            iv = createArray(16);
+
+        } else if (iv.length != 16) {
+            throw new Error('invalid initialation vector size (must be 16 bytes)');
+        }
+
+        this._lastCipherblock = coerceArray(iv, true);
+
+        this._aes = new AES(Ke, Kd);
+    }
+
+    var encryptCbc = function(plaintext) {
         plaintext = coerceArray(plaintext);
 
         if ((plaintext.length % 16) !== 0) {
@@ -467,8 +492,10 @@
 
         return ciphertext;
     }
+    ModeOfOperationCBC.prototype.encrypt = encryptCbc;
+    ModeOfOperationCBCExpanded.prototype.encrypt = encryptCbc;
 
-    ModeOfOperationCBC.prototype.decrypt = function(ciphertext) {
+    var decryptCbc = function(ciphertext) {
         ciphertext = coerceArray(ciphertext);
 
         if ((ciphertext.length % 16) !== 0) {
@@ -491,6 +518,8 @@
 
         return plaintext;
     }
+    ModeOfOperationCBC.prototype.decrypt = decryptCbc;
+    ModeOfOperationCBCExpanded.prototype.decrypt = decryptCbc;
 
 
     /**
@@ -756,6 +785,10 @@
             cfb: ModeOfOperationCFB,
             ofb: ModeOfOperationOFB,
             ctr: ModeOfOperationCTR
+        },
+
+        ModeOfOperationExpanded: {
+            cbc: ModeOfOperationCBCExpanded,
         },
 
         utils: {
